@@ -1201,6 +1201,26 @@ if (activeTab === 'settings') {
   }} /><BottomNav activeTab="settings" onChange={(tab) => setActiveTab(tab)} onInboxPress={handleInboxPress} unreadCount={unreadCount} /></View>;
   }
 
+
+  // The driver has left the route: ask the backend for a new one from where they are now.
+  // The backend saves it to the order (client app) and to the driver's request (this app), and the
+  // map redraws it. Phases: accepted = going to pickup/store, started / picked_up = going to drop-off.
+  const rerouteBusyRef = useRef(false);
+  const handleOffRoute = (lat: number, lng: number) => {
+    const phase = tripStatus;
+    if (!driverId || !effectiveRideId || !showPolyline) return;
+    if (phase !== 'accepted' && phase !== 'started' && phase !== 'picked_up') return;
+    if (rerouteBusyRef.current) return;
+    rerouteBusyRef.current = true;
+    fetch(`${API_BASE}/reroutePolyline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driverId, orderId: effectiveRideId, currentLat: lat, currentLng: lng, phase }),
+    })
+      .catch(() => {})
+      .finally(() => { rerouteBusyRef.current = false; });
+  };
+
   return (
     <View style={styles.container}>
       {/* Trip request handling is now done globally via GlobalTripRequestPanel in _layout.tsx */}
@@ -1250,6 +1270,7 @@ if (activeTab === 'settings') {
           arrivalPosition={arrivalPosition}
           hasActiveTrip={hasActiveTrip}
           zones={showDemand ? demandZones : undefined}
+          onOffRoute={handleOffRoute}
         />
         <SidePanel
           items={[
